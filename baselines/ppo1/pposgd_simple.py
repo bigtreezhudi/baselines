@@ -125,6 +125,16 @@ def learn(env, policy_func, *,
         for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
     compute_losses = U.function([ob, ac, atarg, ret, lrmult], losses)
 
+    with tf.variable_scope('update_1'):
+        tf.summary.scalar("kl_divergence", kloldnew)
+        tf.summary.scalar("entropy", ent)
+        tf.summary.scalar("surrogate_loss", pol_surr)
+        tf.summary.scalar("value_loss", vf_loss)
+    tf.summary.scalar("total-loss", total_loss)
+    tf_summaries = tf.summary.merge_all()
+    get_summaries = U.function([ob, ac, atarg, ret, lrmult], tf_summaries)
+    writer = tf.summary.FileWriter(True, graph=tf.get_default_graph())
+
     U.initialize()
     adam.sync()
 
@@ -185,6 +195,8 @@ def learn(env, policy_func, *,
                 losses.append(newlosses)
             logger.log(fmt_row(13, np.mean(losses, axis=0)))
 
+        summaries = get_summaries(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
+        writer.add_summary(summaries)
         logger.log("Evaluating losses...")
         losses = []
         for batch in d.iterate_once(optim_batchsize):
